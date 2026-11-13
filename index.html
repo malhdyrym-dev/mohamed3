@@ -352,7 +352,7 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
           <div>
             <label>صورتك الشخصية <span class="sub" id="s-photoHint"></span></label>
             <label class="drop" style="margin:0"><input type="file" id="s-photo" accept="image/*">
-              <span class="thumb" id="s-photoThumb" data-i="users" data-s="22"></span><span><b>اختر صورتك</b><small>JPG / PNG</small></span></label>
+              <span class="thumb" id="s-photoThumb" data-i="users" data-s="22"></span><span><b>اختر صورتك</b><small>JPG / PNG (اختياري)</small></span></label>
           </div>
           <div>
             <label>صورة مرفقة بالموضوع (اختياري)</label>
@@ -721,7 +721,7 @@ function enterStudent(id, s) {
 }
 function paintMyPhoto() {
   const img = $('#s-myPhoto'); img.src = me.photo || DEFAULT_AVATAR; img.dataset.full = img.src;
-  $('#s-photoHint').textContent = me.photo ? '(اتركها فارغة للإبقاء على صورتك)' : '(مطلوبة في أول نشر)';
+  $('#s-photoHint').textContent = me.photo ? '(اتركها فارغة للإبقاء على صورتك)' : '(اختياري)';
 }
 
 function bindPreview(inputId, thumbId, fallbackIcon) {
@@ -738,7 +738,7 @@ $('#s-form').addEventListener('submit', async e => {
   const msg = $('#s-pubMsg'), btn = $('#s-pub'), form = e.target;
   const photoFile = $('#s-photo').files[0], imgFile = $('#s-image').files[0], text = $('#s-text').value.trim(), title = $('#s-title').value.trim();
   msg.className = 'status'; msg.textContent = '';
-  if (!me.photo && !photoFile) { msg.className = 'status err'; msg.textContent = 'ارفع صورتك الشخصية أولاً.'; return; }
+  
   btn.disabled = true;
   try {
     if (photoFile) {
@@ -751,14 +751,14 @@ $('#s-form').addEventListener('submit', async e => {
     msg.textContent = '🤖 جارٍ فحص النص بأداة كشف الاقتباس...';
     const plag = await checkPlagiarism(text);
     const ref = db.ref('posts').push();
-    await ref.set({ studentId: me.id, studentName: me.name, studentPhoto: me.photo, type: $('#s-type').value, title, text, image, plagiarism: plag, createdAt: TS });
+    await ref.set({ studentId: me.id, studentName: me.name, studentPhoto: me.photo || DEFAULT_AVATAR, type: $('#s-type').value, title, text, image, plagiarism: plag, createdAt: TS });
     if (plag.flagged) {
       await db.ref('alerts').push({ postId: ref.key, postTitle: title, studentId: me.id, studentName: me.name, site: plag.site, url: plag.url, score: plag.score, read: false, createdAt: TS });
       msg.className = 'status err'; msg.textContent = `تم النشر، لكن رُصد تشابه كبير مع «${plag.site}» وأُبلغ الدكتور.`;
     } else { msg.className = 'status ok'; msg.textContent = '✅ تم النشر بنجاح.'; }
     form.reset(); $('#s-pname').value = me.name; $('#s-count').textContent = '0 كلمة';
     $('#s-photoThumb').dataset.i = 'users'; $('#s-imageThumb').dataset.i = 'image'; paintIcons($('#s-form'));
-  } catch (err) { msg.className = 'status err'; msg.textContent = 'حدث خطأ أثناء النشر: ' + (err.message || err); }
+  } catch (err) { console.error(err); msg.className = 'status err'; msg.textContent = 'حدث خطأ أثناء النشر: ' + (err.message || err); }
   finally { btn.disabled = false; }
 });
 
