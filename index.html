@@ -344,7 +344,6 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:26px 10px 3
       </div>
     </div>
 
-    <!-- نافذة منبثقة لعرض قوائم الإحصائيات المتقدمة -->
     <div id="a-statsModal" class="modal hidden">
       <div class="card-box">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -425,22 +424,13 @@ const paintIcons = (root = document) => root.querySelectorAll('[data-i]').forEac
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const safeUrl = u => (/^https?:\/\//i.test(u || '') ? u : '#');
 
-// دالة التطبيع الشاملة للأسماء والنصوص (Normalization) لتجاهل الهمزات، الحركات، التنوين والمسافات
 const normalizeAr = t => String(t || '')
-  .replace(/[ً-ٰٟـ]/g, '')
-  .replace(/[أإآٱ]/g, 'ا')
-  .replace(/ى/g, 'ي')
-  .replace(/ة/g, 'ه')
-  .replace(/[،؛؟.,]/g, ' ')
-  .replace(/[^؀-ۿa-zA-Z0-9\s]/g, ' ')
-  .replace(/\s+/g, ' ')
-  .trim()
-  .toLowerCase();
+  .replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+  .replace(/[،؛؟.,]/g, ' ').replace(/[^؀-ۿa-zA-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 
 const fmtDate = ts => ts ? new Date(ts).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 const countWords = t => (t.trim().match(/\S+/g) || []).length;
 
-// ضغط الصور مسبقاً عبر Canvas لسرعة رفع فائقة عبر شبكات المحمول
 function resizeImage(file, max = 1000, q = .75) {
   return new Promise((res, rej) => {
     const img = new Image();
@@ -457,7 +447,6 @@ function resizeImage(file, max = 1000, q = .75) {
   });
 }
 
-// دالة رفع الصور مع الحماية الذكية (Timeout Fallback) ضد بطء الإنترنت
 async function uploadImage(file, folder) {
   const blob = await resizeImage(file);
   const ref = storage.ref(`${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`);
@@ -498,6 +487,8 @@ function plagBadge(p) {
   const pl = p.plagiarism;
   return `<a class="plag" href="${esc(safeUrl(pl.url))}" target="_blank" rel="noopener noreferrer">${ico('alert', 13)} جُلب من موقع ${esc(pl.site || 'غير معروف')} — الرابط الأصلي</a>`;
 }
+
+// عرض زر الحذف للأدمن مباشرة في الصفحة الرئيسية (العرض العام) أيضاً
 function postCard(p, extra = '', i = 0) {
   const full = esc(p.text || '').replace(/\n/g, '<br>');
   const body = (p.text || '').length > 280
@@ -506,6 +497,10 @@ function postCard(p, extra = '', i = 0) {
   const av = esc(p.studentPhoto || DEFAULT_AVATAR), t = esc(TYPES[p.type] || p.type);
   const media = p.image
     ? `<div class="post-media"><img class="main zoomable" src="${esc(p.image)}" data-full="${esc(p.image)}" alt="صورة الموضوع" loading="lazy"><span class="type">${t}</span></div>` : '';
+  
+  // زر حذف سريع يظهر فقط للأدمن المسجل دخول في الصفحة الرئيسية
+  const adminDeleteBtn = adminOn ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)"><button class="btn danger soft-d sm" data-act="globalDelete" data-id="${p.id}">${ico('trash', 14)} حذف الخبر/الموضوع (أدمن)</button></div>` : '';
+
   return `<article class="post ${isFlagged(p) ? 'flagged' : ''}" style="animation-delay:${Math.min(i, 8) * 50}ms">
     ${media}
     <div class="post-body">
@@ -514,7 +509,7 @@ function postCard(p, extra = '', i = 0) {
       <div class="by">
         <img class="avatar zoomable" src="${av}" data-full="${av}" alt="صورة الصحفي">
         <div class="by-info"><strong>${esc(p.studentName)}</strong>${plagBadge(p)}<small>${fmtDate(p.createdAt)}</small></div>
-      </div>${extra}
+      </div>${extra}${adminDeleteBtn}
     </div></article>`;
 }
 
@@ -599,6 +594,23 @@ function renderPublic() {
     : `<div class="empty">لا توجد مواضيع في قسم «${TAB_LABELS[curType]}» بعد.</div>`;
 }
 
+// دالة لحذف أي خبر أو موضوع مباشرة من الواجهة العامة عند الضغط عليه من قبل الأدمن
+$('#pubGrid').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="globalDelete"]'); if (!b) return;
+  const id = b.dataset.id;
+  if (!confirm('هل أنت متأكد من حذف هذا الخبر أو الموضوع نهائياً؟')) return;
+  try {
+    const p = POSTS[id];
+    await db.ref('posts/' + id).remove();
+    await db.ref('feedback/' + id).remove();
+    for (const [aid, a] of Object.entries(ALERTS)) if (a.postId === id) await db.ref('alerts/' + aid).remove();
+    if (p && p.image) deleteImageByUrl(p.image);
+    toast('تم حذف الخبر بنجاح ✅', 'ok');
+  } catch (err) {
+    toast('تعذر الحذف: ' + err.message, 'error');
+  }
+});
+
 let me = null, fbRefs = [], studentStarted = false;
 
 async function studentInit() {
@@ -616,7 +628,6 @@ async function studentInit() {
   $('#s-login').classList.remove('hidden');
 }
 
-// مطابقة ذكية وجزئية للأسماء بدعم التليين والتطبيع الشامل
 $('#s-loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = $('#s-loginMsg'); msg.textContent = '';
@@ -625,7 +636,6 @@ $('#s-loginForm').addEventListener('submit', async e => {
     if (!inputVal) return void (msg.textContent = 'الرجاء إدخال اسم صحيح.');
     const all = (await db.ref('students').once('value')).val() || {};
     
-    // بحث ذكي: يسمح بالمطابقة التامة أو إذا كان مدخل الطالب جزءاً من الاسم المسجل أو العكس
     const f = Object.entries(all).find(([, s]) => {
       const dbName = normalizeAr(s.name);
       return dbName === inputVal || dbName.includes(inputVal) || inputVal.includes(dbName);
@@ -743,6 +753,7 @@ function adminShow(v) {
   adminOn = v === 'app';
   $('#a-login').classList.toggle('hidden', adminOn); $('#a-app').classList.toggle('hidden', !adminOn);
   $('#logoutBtn').classList.toggle('hidden', !adminOn);
+  renderPublic(); // إعادة رسم الصفحة الرئيسية لتظهر أزرار الحذف الخاصة بالأدمن فور تسجيل الدخول
 }
 $('#a-loginForm').addEventListener('submit', async e => {
   e.preventDefault(); $('#a-loginMsg').textContent = '';
@@ -786,18 +797,15 @@ function countsChips(list) {
   return Object.keys(TYPES).map(t => { const n = list.filter(p => p.type === t).length; return n ? `<span class="chip">نشر ${TYPES[t]} × ${n}</span>` : ''; }).join('');
 }
 
-// عرض لوحة التحكم والإحصائيات التفاعلية المطلوبة
 function renderStudentsList() {
   const q = normalizeAr($('#a-search').value);
   const entries = Object.entries(STUDENTS).sort((a, b) => a[1].name.localeCompare(b[1].name, 'ar'));
   const allPosts = postsArr();
   
-  // حساب الطلاب الذين نشروا والطلاب الذين لم ينشروا
   const publishedStudentIds = new Set(allPosts.map(p => p.studentId));
   const activePublishers = entries.filter(([id]) => publishedStudentIds.has(id));
   const noPostStudents = entries.filter(([id]) => !publishedStudentIds.has(id));
   
-  // حساب الأكثر نشراً وترتيبهم تنازلياً
   const studentPostCounts = entries.map(([id, s]) => ({
     id,
     name: s.name,
@@ -836,7 +844,6 @@ function renderStudentsList() {
   }).join('');
   $('#a-list').innerHTML = rows || '<div class="empty">لا يوجد طلاب بعد. أضفهم من تبويب «إضافة طلاب».</div>';
 
-  // تفاعل النقر على البطاقات الإحصائية الجديدة
   document.querySelectorAll('.stat[data-stat]').forEach(card => {
     card.onclick = () => {
       const type = card.dataset.stat;
@@ -845,7 +852,6 @@ function renderStudentsList() {
   });
 }
 
-// نافذة تفاصيل الإحصائيات المنبثقة
 function openStatsModal(type, data) {
   const modal = $('#a-statsModal'), title = $('#a-statsModalTitle'), body = $('#a-statsModalBody');
   let html = '';
