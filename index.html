@@ -6,58 +6,8 @@
   منصة الصحافة الإلكترونية — ملف واحد (HTML + CSS + JS)
   الصفحات (بالروابط):
     index.html           ← العرض العام (4 تبويبات)
-    index.html#/student  ← بوابة الطلاب  (هذا هو "رابط الطلاب")
-    index.html#/admin    ← لوحة الدكتور
-
-  خطوات الإعداد:
-  1) أنشئ مشروع Firebase وأضف Web App، ثم الصق الإعدادات في firebaseConfig أدناه.
-  2) فعّل Authentication: Email/Password (للدكتور) + Anonymous (للطلاب).
-  3) فعّل Realtime Database والصق هذه القواعد (Rules):
-{
-  "rules": {
-    ".read": false, ".write": false,
-    "admins": { "$uid": { ".read": "auth != null && auth.uid === $uid" } },
-    "students": {
-      ".read": "auth != null",
-      "$sid": {
-        ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
-        "photo": { ".write": "auth != null", ".validate": "newData.isString() && newData.val().length < 1000" }
-      }
-    },
-    "studentCodes": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
-    },
-    "posts": {
-      ".read": true,
-      "$pid": {
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || !data.exists())",
-        ".validate": "newData.hasChildren(['studentId','studentName','type','title','text','createdAt'])"
-      }
-    },
-    "feedback": {
-      ".read": "auth != null",
-      "$pid": { ".write": "auth != null && root.child('admins').child(auth.uid).exists()" }
-    },
-    "alerts": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
-      "$aid": { ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || !data.exists())" }
-    }
-  }
-}
-  4) فعّل Storage والصق هذه القواعد:
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{folder}/{file} {
-      allow read: if true;
-      allow write: if request.auth != null && request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
-    }
-  }
-}
-  5) أنشئ حساب الدكتور في Authentication > Users، وأضف في Database:  admins / <UID> : true
-     (جرّب الدخول في #/admin وسيعرض لك الـ UID إن لم يكن مضافاً).
-  6) ارفع الملف على Firebase Hosting أو أي استضافة HTTPS (لا يعمل من file:// مباشرة).
+    index.html#/student  ← بوابة الطلاب  (رابط الطلاب)
+    index.html#/admin    ← لوحة الدكتور (الإدارة)
 ==========================================================================
 -->
 <meta charset="UTF-8">
@@ -71,9 +21,6 @@ service firebase.storage {
 <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.dataset.theme=t}catch(e){}})()</script>
 
 <style>
-/* =====================================================================
-   1) المتغيرات والأساسيات
-   ===================================================================== */
 :root{
   --bg:#f5f6fb; --surface:#fff; --surface-2:#f0f2f9; --text:#0f172a; --muted:#667085; --line:#e5e8f1;
   --brand:#5b5bf0; --brand-2:#8b5cf6; --brand-soft:#ecebff; --brand-ink:#3b3bc4;
@@ -96,9 +43,6 @@ button{font-family:inherit}
 .wrap{width:min(1180px,100% - 28px);margin-inline:auto}
 svg{flex:none}
 
-/* =====================================================================
-   2) الشريط العلوي
-   ===================================================================== */
 .nav{position:sticky;top:0;z-index:40;backdrop-filter:saturate(1.6) blur(14px);background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom:1px solid var(--line)}
 .nav-in{display:flex;align-items:center;justify-content:space-between;gap:10px;height:64px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;text-decoration:none}
@@ -111,9 +55,6 @@ svg{flex:none}
 .icon-btn{padding:8px;border-radius:12px;color:var(--muted)}
 @media(max-width:560px){.brand small{display:none}.nav-links a span{display:none}.nav-links a{padding:9px}}
 
-/* =====================================================================
-   3) أزرار ونماذج
-   ===================================================================== */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;font-weight:700;font-size:.95rem;padding:11px 20px;border-radius:14px;text-decoration:none;transition:.18s;background:var(--text);color:var(--bg)}
 .btn:hover{transform:translateY(-1px);filter:brightness(1.12)}
 .btn:disabled{opacity:.55;cursor:wait;transform:none}
@@ -138,7 +79,6 @@ textarea{min-height:170px;resize:vertical}
 .status{margin-top:12px;font-weight:700;font-size:.92rem}.status.err{color:var(--danger)}.status.ok{color:var(--ok)}
 .counter{float:left;font-weight:600;color:var(--muted);font-size:.78rem}
 
-/* رفع الصور */
 .drop{display:flex;align-items:center;gap:12px;border:1.5px dashed var(--line);border-radius:var(--r-sm);padding:12px;cursor:pointer;background:var(--surface-2);transition:.15s}
 .drop:hover{border-color:var(--brand);background:var(--brand-soft)}
 .drop input{display:none}
@@ -146,9 +86,6 @@ textarea{min-height:170px;resize:vertical}
 .drop .thumb img{width:100%;height:100%;object-fit:cover}
 .drop b{display:block;font-size:.88rem;line-height:1.4}.drop small{color:var(--muted)}
 
-/* =====================================================================
-   4) الصفحة العامة: الهيرو + التبويبات + البطاقات
-   ===================================================================== */
 .hero{position:relative;overflow:hidden;margin-top:22px;border-radius:28px;padding:clamp(28px,5vw,56px);color:#fff;background:radial-gradient(900px 400px at 10% -10%,#8b5cf6 0%,transparent 60%),radial-gradient(700px 400px at 100% 110%,#06b6d4 0%,transparent 55%),linear-gradient(135deg,#1e1b4b,#312e81)}
 .hero::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1px);background-size:22px 22px;mask-image:linear-gradient(to left,#000,transparent 70%);pointer-events:none}
 .hero>*{position:relative;z-index:1}
@@ -189,7 +126,6 @@ textarea{min-height:170px;resize:vertical}
 .by-info{display:flex;flex-direction:column;line-height:1.45;min-width:0}
 .by-info strong{font-size:.95rem}.by-info small{color:var(--muted);font-size:.76rem}
 .plag{display:inline-flex;align-items:center;gap:6px;background:var(--danger);color:#fff;text-decoration:none;font-size:.74rem;font-weight:700;padding:2px 10px;border-radius:8px;margin:3px 0;width:fit-content;max-width:100%}
-.plag:hover{filter:brightness(.9)}
 .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:56px 12px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
 .skel{height:330px;border-radius:var(--r);background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%);background-size:400% 100%;animation:sh 1.3s infinite}
 @keyframes sh{0%{background-position:100% 0}100%{background-position:0 0}}
@@ -197,9 +133,6 @@ textarea{min-height:170px;resize:vertical}
 .fb{margin-top:12px;background:var(--warn-soft);border-radius:14px;padding:10px 14px;font-size:.88rem}
 .fb b{display:flex;align-items:center;gap:6px;color:var(--warn);font-size:.8rem;margin-bottom:2px}
 
-/* =====================================================================
-   5) صفحة الطالب
-   ===================================================================== */
 .page{padding:26px 0 60px}
 .center-card{max-width:440px;margin:36px auto}
 .center-card .ic{width:54px;height:54px;border-radius:16px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin-bottom:14px}
@@ -209,9 +142,6 @@ textarea{min-height:170px;resize:vertical}
 .me h2{margin:0}
 .sect-title{display:flex;align-items:center;gap:10px;font-size:1.2rem;font-weight:800;margin:30px 0 14px}
 
-/* =====================================================================
-   6) لوحة الإدارة
-   ===================================================================== */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:18px 0}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow);display:flex;gap:14px;align-items:center}
 .stat .si{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
@@ -230,7 +160,6 @@ textarea{min-height:170px;resize:vertical}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;padding:2px 11px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink)}
 .chip.none{background:var(--surface-2);color:var(--muted)}.chip.red{background:var(--danger-soft);color:var(--danger)}
-.s-code{display:flex;align-items:center;gap:4px}
 code.cd{background:var(--surface-2);border:1px solid var(--line);padding:2px 10px;border-radius:8px;font-weight:800;letter-spacing:2px;font-size:.85rem}
 @media(max-width:820px){.srow{grid-template-columns:1fr}}
 .alert{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;background:var(--danger-soft);border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:10px}
@@ -243,9 +172,6 @@ code.cd{background:var(--surface-2);border:1px solid var(--line);padding:2px 10p
 .tbl{width:100%;border-collapse:collapse;font-size:.92rem}
 .tbl th,.tbl td{text-align:right;padding:10px 12px;border-bottom:1px solid var(--line)}.tbl th{color:var(--muted);font-size:.8rem}
 
-/* =====================================================================
-   7) نوافذ منبثقة + إشعارات
-   ===================================================================== */
 .modal{position:fixed;inset:0;z-index:60;background:rgba(8,10,20,.6);backdrop-filter:blur(6px);display:grid;place-items:center;padding:14px}
 .modal .card-box{width:min(560px,100%);max-height:92vh;overflow:auto;box-shadow:var(--shadow-lg)}
 .zoom{position:fixed;inset:0;z-index:100;background:rgba(5,7,14,.92);backdrop-filter:blur(8px);display:grid;place-items:center;padding:18px;cursor:zoom-out;animation:fade .2s}
@@ -260,7 +186,6 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
 </head>
 
 <body>
-<!-- ============================ الشريط العلوي ============================ -->
 <header class="nav">
   <div class="wrap nav-in">
     <a class="brand" href="#/">
@@ -279,9 +204,6 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
 
 <main class="wrap">
 
-<!-- ======================================================================
-     الصفحة العامة: عرض المواضيع
-     ====================================================================== -->
 <section id="r-public">
   <div class="hero">
     <span class="eyebrow"><i data-i="file" data-s="14"></i> منصة تطبيقية لمادة الصحافة الإلكترونية</span>
@@ -303,12 +225,7 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
   <div class="grid" id="pubGrid"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
 </section>
 
-<!-- ======================================================================
-     بوابة الطالب
-     ====================================================================== -->
 <section id="r-student" class="page hidden">
-
-  <!-- الدخول -->
   <div id="s-login" class="card-box center-card hidden">
     <div class="ic" data-i="pen" data-s="26"></div>
     <h2>مرحباً بك في بوابة الطلاب</h2>
@@ -321,7 +238,6 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
     </form>
   </div>
 
-  <!-- صفحة الطالب -->
   <div id="s-app" class="hidden">
     <div class="card-box">
       <div class="cover"></div>
@@ -370,11 +286,7 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
   </div>
 </section>
 
-<!-- ======================================================================
-     لوحة الدكتور
-     ====================================================================== -->
 <section id="r-admin" class="page hidden">
-
   <div id="a-login" class="card-box center-card hidden">
     <div class="ic" data-i="shield" data-s="26"></div>
     <h2>دخول الإدارة</h2>
@@ -435,7 +347,6 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
       </div>
     </div>
 
-    <!-- نافذة تعديل موضوع -->
     <div id="a-editModal" class="modal hidden">
       <div class="card-box">
         <h2>تعديل الموضوع</h2>
@@ -452,18 +363,14 @@ footer{text-align:center;color:var(--muted);font-size:.82rem;padding:26px 10px 3
 </section>
 </main>
 
-<footer> ✨ تطوير و تنفيذ محمد اسماعيل عبد العظيم 🌐   </footer>
+<footer>مشروع تخرج — قسم الصحافة والإعلام</footer>
 
-<!-- Firebase (النسخة المتوافقة compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
 <script>
-/* =====================================================================
-   A) إعدادات Firebase — مدمجة بمشروعك (mohamed-32774)
-   ===================================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCJjJhWZ2hUB6wm2xajsLxvpRK4TTjYY2I",
   authDomain: "mohamed-32774.firebaseapp.com",
@@ -478,15 +385,11 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database(), storage = firebase.storage(), auth = firebase.auth();
 const TS = firebase.database.ServerValue.TIMESTAMP;
 
-/* =====================================================================
-   B) ثوابت ودوال مساعدة
-   ===================================================================== */
 const $ = (s, r = document) => r.querySelector(s);
 const TYPES = { news: 'خبر', article: 'مقال', report: 'تقرير', interview: 'حديث' };
 const TAB_LABELS = { news: 'الأخبار', article: 'المقالات', report: 'التقارير', interview: 'الأحاديث' };
 const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#c9cdf5"/><circle cx="50" cy="38" r="18" fill="#7c80d6"/><path d="M14 92c4-24 22-34 36-34s32 10 36 34z" fill="#7c80d6"/></svg>');
 
-// أيقونات SVG خفيفة
 const ICON = {
   home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
@@ -589,9 +492,6 @@ function postCard(p, extra = '', i = 0) {
     </div></article>`;
 }
 
-/* =====================================================================
-   C) أداة كشف الاقتباس
-   ===================================================================== */
 const PLAG_CONFIG = { mode: 'simulate', threshold: 0.45, shingleSize: 4, minWords: 15 };
 const KNOWN_SOURCES = [
   { site: 'موقع الأخبار التجريبي', url: 'https://example.com/news/university-digital-journalism',
@@ -624,9 +524,6 @@ async function checkPlagiarism(text) {
   catch (e) { return { ...base, flagged: false, score: 0, site: '', url: '', error: true }; }
 }
 
-/* =====================================================================
-   D) الحالة العامة + الموجّه + المصادقة
-   ===================================================================== */
 let POSTS = {}, postsLoaded = false;
 let route = 'public', authReady = false, resolveAuth;
 const authPromise = new Promise(r => resolveAuth = r);
@@ -658,9 +555,6 @@ db.ref('posts').on('value', s => {
 });
 const postsArr = () => Object.entries(POSTS).map(([id, p]) => ({ id, ...p })).sort((a, b) => b.createdAt - a.createdAt);
 
-/* =====================================================================
-   E) الصفحة العامة
-   ===================================================================== */
 let curType = 'news';
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -679,9 +573,6 @@ function renderPublic() {
     : `<div class="empty">لا توجد مواضيع في قسم «${TAB_LABELS[curType]}» بعد.</div>`;
 }
 
-/* =====================================================================
-   F) بوابة الطالب
-   ===================================================================== */
 let me = null, fbRefs = [], studentStarted = false;
 
 async function studentInit() {
@@ -742,7 +633,7 @@ $('#s-form').addEventListener('submit', async e => {
   btn.disabled = true;
   try {
     if (photoFile) {
-      msg.textContent = 'جارٍ رفع صورتك...';
+      msg.textContent = 'جارٍ رفع صورتك الشخصية...';
       me.photo = await uploadImage(photoFile, 'students');
       await db.ref(`students/${me.id}/photo`).set(me.photo); paintMyPhoto();
     }
@@ -778,9 +669,6 @@ function renderMyPosts() {
   });
 }
 
-/* =====================================================================
-   G) لوحة الدكتور
-   ===================================================================== */
 let STUDENTS = {}, CODES = {}, ALERTS = {}, FEEDBACK = {};
 let adminOn = false, adminStarted = false, knownAlerts = null, curSid = null, editingId = null, lastAdded = [];
 
